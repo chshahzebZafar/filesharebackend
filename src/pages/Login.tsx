@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
@@ -15,9 +15,14 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/';
+  
+  // Get redirect path from URL params or location state
+  const redirectTo = searchParams.get('redirect') || 
+                    (location.state as any)?.from?.pathname || 
+                    '/';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +51,7 @@ const Login = () => {
       });
 
       // Redirect to the original destination or home
-      navigate(redirectTo);
+      navigate(redirectTo, { replace: true });
     } catch (error) {
       toast({
         title: "Login failed",

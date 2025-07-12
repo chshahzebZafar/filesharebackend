@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Index from './pages/Index';
@@ -36,18 +37,54 @@ const App = () => {
               <Route path="/contact" element={<Contact />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/features" element={<Features />} />
-              <Route path="/download" element={<Download />} />
-              <Route path="/share/:shareId" element={<Share />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-              <Route path="/stats" element={<Stats />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/settings" element={<Settings />} />
-              {/* Advanced Features Routes */}
-              <Route path="/file-manager" element={<AdvancedFileManager />} />
-              <Route path="/ai-analyzer" element={<AIFileAnalyzer />} />
-              <Route path="/collaboration" element={<RealTimeCollaboration />} />
-              <Route path="/analytics" element={<AdvancedAnalytics />} />
+              <Route path="/share/:shareId" element={<Share />} />
+              
+              {/* Protected Routes - Require Authentication */}
+              <Route path="/download" element={
+                <ProtectedRoute>
+                  <Download />
+                </ProtectedRoute>
+              } />
+              <Route path="/stats" element={
+                <ProtectedRoute>
+                  <Stats />
+                </ProtectedRoute>
+              } />
+              <Route path="/history" element={
+                <ProtectedRoute>
+                  <History />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              
+              {/* Advanced Features Routes - All Protected */}
+              <Route path="/file-manager" element={
+                <ProtectedRoute>
+                  <AdvancedFileManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/ai-analyzer" element={
+                <ProtectedRoute>
+                  <AIFileAnalyzer />
+                </ProtectedRoute>
+              } />
+              <Route path="/collaboration" element={
+                <ProtectedRoute>
+                  <RealTimeCollaboration />
+                </ProtectedRoute>
+              } />
+              <Route path="/analytics" element={
+                <ProtectedRoute>
+                  <AdvancedAnalytics />
+                </ProtectedRoute>
+              } />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
