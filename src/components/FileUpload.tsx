@@ -1,8 +1,10 @@
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, X, File, Image, FileText, Video, Music } from 'lucide-react';
+import { Upload, X, File, Image, FileText, Video, Music, Copy, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { apiService, UploadResponse, MultipleUploadResponse } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface UploadedFile {
   id: string;
@@ -11,16 +13,23 @@ interface UploadedFile {
   type: string;
   progress: number;
   file: File;
+  shareId?: string;
+  downloadUrl?: string;
+  qrCode?: string;
 }
 
 interface FileUploadProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
+  onFileRemoved?: (fileId: string) => void;
+  oneTimeDownload?: boolean;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded, onFileRemoved, oneTimeDownload = false }) => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return Image;
@@ -38,7 +47,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleFiles = useCallback((fileList: FileList) => {
+  const handleFiles = useCallback(async (fileList: FileList) => {
+    // Prevent multiple simultaneous uploads
+    if (isUploading) {
+      console.log('Upload already in progress, ignoring new files');
+      return;
+    }
+    
+    console.log('handleFiles called with', fileList.length, 'files');
+    
     const newFiles: UploadedFile[] = Array.from(fileList).map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
@@ -48,32 +65,83 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
       file
     }));
 
-    setFiles(prev => [...prev, ...newFiles]);
+    console.log('New files to upload:', newFiles.map(f => f.name));
 
-    // Simulate upload progress
-    newFiles.forEach((file, index) => {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.random() * 15;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-        }
-        
-        setFiles(prev => 
-          prev.map(f => 
-            f.id === file.id ? { ...f, progress } : f
-          )
-        );
+    // Clear any existing files and start fresh with the new batch
+    setFiles(newFiles);
+    setIsUploading(true);
 
-        if (progress === 100 && index === newFiles.length - 1) {
-          setTimeout(() => {
-            onFilesUploaded([...files, ...newFiles]);
-          }, 500);
+    // Simulate progress updates
+    const progressInterval = setInterval(() => {
+      setFiles(prev => 
+        prev.map(f => {
+          if (newFiles.some(nf => nf.id === f.id) && f.progress < 90) {
+            return { ...f, progress: Math.min(f.progress + Math.random() * 15, 90) };
+          }
+          return f;
+        })
+      );
+    }, 200);
+
+    try {
+      // Always use the multiple files upload API for consistency
+      // This ensures all files get the same share link
+      const fileArray = newFiles.map(f => f.file);
+      console.log('Uploading', fileArray.length, 'files as batch');
+      
+      const response = await apiService.uploadMultipleFiles(fileArray, { oneTimeDownload });
+      
+      clearInterval(progressInterval);
+      
+      console.log('Upload response:', response);
+      
+      // Get the shared download URL from the first file (they all have the same URL now)
+      const sharedDownloadUrl = response.files[0]?.downloadUrl;
+      const sharedShareId = response.files[0]?.shareId;
+      
+      console.log('Shared URL:', sharedDownloadUrl);
+      console.log('Shared Share ID:', sharedShareId);
+      
+      const updatedFiles = newFiles.map((file, index) => {
+        const uploadResult = response.files[index];
+        if (uploadResult && !uploadResult.error) {
+          return {
+            ...file,
+            progress: 100,
+            shareId: sharedShareId, // Use the same share ID for all files
+            downloadUrl: sharedDownloadUrl, // Use the same download URL for all files
+            qrCode: uploadResult.qrCode
+          };
         }
-      }, 200);
-    });
-  }, [files, onFilesUploaded]);
+        return { ...file, progress: 100 };
+      });
+
+      console.log('Updated files with shared link:', updatedFiles.map(f => ({ name: f.name, url: f.downloadUrl })));
+
+      setFiles(updatedFiles);
+
+      const successMessage = newFiles.length === 1 
+        ? "Your file has been uploaded and is ready to share."
+        : `Uploaded ${response.files.filter(f => !f.error).length} files with a single share link.`;
+
+      toast({
+        title: "Upload successful!",
+        description: successMessage,
+      });
+
+      onFilesUploaded(updatedFiles);
+    } catch (error) {
+      clearInterval(progressInterval);
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload files",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onFilesUploaded, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -98,16 +166,36 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
+      console.log('File input triggered with', files.length, 'files');
       handleFiles(files);
+      // Clear the input value to allow selecting the same files again
+      e.target.value = '';
     }
   }, [handleFiles]);
 
   const removeFile = (id: string) => {
     setFiles(prev => prev.filter(file => file.id !== id));
+    onFileRemoved?.(id);
   };
 
   const openFileDialog = () => {
     fileInputRef.current?.click();
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied to clipboard!",
+        description: "Share link has been copied to your clipboard.",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy failed",
+        description: "Please copy the link manually.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -144,8 +232,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
           </p>
           <Button 
             className="bg-teal-600 hover:bg-teal-700 text-white font-medium px-8 py-3 rounded-lg transition-all duration-200 hover:scale-105"
+            disabled={isUploading}
           >
-            Select Files
+            {isUploading ? 'Uploading...' : 'Select Files'}
           </Button>
         </div>
       </div>
@@ -155,6 +244,31 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Uploading Files ({files.length})
           </h3>
+          
+          {/* Show the single share link for ALL files (single or multiple) */}
+          {files[0]?.downloadUrl && (
+            <div className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Link className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-medium text-teal-800 dark:text-teal-200">
+                  {files.length === 1 ? 'Share Link' : 'Share Link for All Files'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 text-xs text-teal-600 dark:text-teal-400 truncate bg-white dark:bg-gray-800 px-2 py-1 rounded">
+                  {files[0].downloadUrl}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => copyToClipboard(files[0].downloadUrl!)}
+                  className="h-6 w-6 p-0 text-teal-600 hover:text-teal-700 hover:bg-teal-100 dark:hover:bg-teal-950/40"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          )}
           
           {files.map((file) => {
             const IconComponent = getFileIcon(file.type);
@@ -194,6 +308,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
                     </span>
                   </div>
                   <Progress value={file.progress} className="h-2" />
+                  
+                  {/* For multiple files, show a small indicator that this file is part of the shared batch */}
+                  {file.downloadUrl && files.length > 1 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        <Link className="w-3 h-3" />
+                        Part of shared batch
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );

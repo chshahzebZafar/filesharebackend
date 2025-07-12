@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Shield, Zap, Globe, ArrowRight, CheckCircle, Check, Star } from 'lucide-react';
+import { Shield, Zap, Globe, ArrowRight, CheckCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import FileUpload from '@/components/FileUpload';
 import LinkSettings from '@/components/LinkSettings';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiService } from '@/services/api';
 
 interface UploadedFile {
   id: string;
@@ -19,10 +19,32 @@ interface UploadedFile {
 const Index = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showLinkSettings, setShowLinkSettings] = useState(false);
+  const [storageUsed, setStorageUsed] = useState(0);
+  const [storageLimit] = useState(2 * 1024 * 1024 * 1024); // 2GB in bytes
+  const { isAuthenticated, user } = useAuth();
 
   const handleFilesUploaded = (files: UploadedFile[]) => {
     setUploadedFiles(files);
     setShowLinkSettings(true);
+    
+    // Calculate total storage used
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    setStorageUsed(totalSize);
+    
+    // Save to localStorage for persistence
+    localStorage.setItem('uploadedFiles', JSON.stringify(files));
+    localStorage.setItem('storageUsed', totalSize.toString());
+  };
+
+  const handleFileRemoved = (fileId: string) => {
+    setUploadedFiles(prev => {
+      const updatedFiles = prev.filter(file => file.id !== fileId);
+      const totalSize = updatedFiles.reduce((sum, file) => sum + file.size, 0);
+      setStorageUsed(totalSize);
+      localStorage.setItem('uploadedFiles', JSON.stringify(updatedFiles));
+      localStorage.setItem('storageUsed', totalSize.toString());
+      return updatedFiles;
+    });
   };
 
   const features = [
@@ -43,66 +65,10 @@ const Index = () => {
     }
   ];
 
-  const pricingPlans = [
-    {
-      name: "Free",
-      price: "0",
-      period: "month",
-      description: "Perfect for personal use and small file sharing needs",
-      features: [
-        "Up to 2GB file size",
-        "5 transfers per day",
-        "7-day file retention",
-        "Basic encryption",
-        "Standard support"
-      ],
-      popular: false,
-      buttonText: "Get Started",
-      buttonVariant: "outline" as const
-    },
-    {
-      name: "Pro",
-      price: "9",
-      period: "month", 
-      description: "Ideal for professionals and small teams",
-      features: [
-        "Up to 10GB file size",
-        "Unlimited transfers",
-        "30-day file retention",
-        "Advanced encryption",
-        "Priority support",
-        "Custom branding",
-        "Password protection"
-      ],
-      popular: true,
-      buttonText: "Start Free Trial",
-      buttonVariant: "default" as const
-    },
-    {
-      name: "Business",
-      price: "29",
-      period: "month",
-      description: "For businesses and large teams with advanced needs",
-      features: [
-        "Up to 50GB file size",
-        "Unlimited transfers",
-        "90-day file retention",
-        "Enterprise encryption",
-        "24/7 priority support",
-        "Full white-label",
-        "Advanced analytics",
-        "Team management",
-        "API access"
-      ],
-      popular: false,
-      buttonText: "Contact Sales",
-      buttonVariant: "outline" as const
-    }
-  ];
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-teal-50/30 to-blue-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      <Header />
       
       {/* Enhanced Hero Section */}
       <section className="relative py-20 overflow-hidden">
@@ -169,6 +135,10 @@ const Index = () => {
               <span className="text-lg">No registration required. Just upload, share, and download.</span>
             </p>
 
+
+
+
+
             {/* Enhanced feature badges */}
             <div className="flex flex-wrap justify-center gap-4 mb-8 animate-slide-up" style={{ animationDelay: '0.6s' }}>
               <div className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full border border-teal-200 dark:border-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
@@ -186,10 +156,38 @@ const Index = () => {
             </div>
           </div>
 
+          {/* Storage Indicator */}
+          <div className="max-w-2xl mx-auto mb-6 animate-slide-up" style={{ animationDelay: '0.8s' }}>
+            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/20 dark:border-gray-700/20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Storage Used</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {(storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB / 2 GB
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    storageUsed / storageLimit > 0.9 ? 'bg-red-500' : 
+                    storageUsed / storageLimit > 0.7 ? 'bg-yellow-500' : 'bg-teal-500'
+                  }`}
+                  style={{ width: `${Math.min((storageUsed / storageLimit) * 100, 100)}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {((storageLimit - storageUsed) / (1024 * 1024 * 1024)).toFixed(2)} GB remaining
+              </p>
+            </div>
+          </div>
+
           {/* Enhanced Upload Section */}
           <div className="animate-slide-up relative" style={{ animationDelay: '0.9s' }}>
             <div className="absolute inset-0 bg-gradient-to-r from-teal-500/5 to-blue-500/5 rounded-3xl blur-3xl"></div>
-            <FileUpload onFilesUploaded={handleFilesUploaded} />
+            <FileUpload 
+              onFilesUploaded={handleFilesUploaded} 
+              onFileRemoved={handleFileRemoved}
+              oneTimeDownload={false} // This will be controlled by LinkSettings
+            />
           </div>
 
           {/* Enhanced Success State */}
@@ -211,15 +209,47 @@ const Index = () => {
                 <p className="text-gray-600 dark:text-gray-300 text-center mb-6 text-lg">
                   {uploadedFiles.length} file{uploadedFiles.length > 1 ? 's' : ''} ready to share
                 </p>
-                <div className="flex justify-center">
-                  <Button 
-                    onClick={() => setShowLinkSettings(true)}
-                    className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white font-semibold px-10 py-4 text-lg rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl flex items-center gap-3 border-0"
-                  >
-                    Generate Share Link
-                    <ArrowRight className="w-5 h-5 animate-pulse" />
-                  </Button>
-                </div>
+                
+                {isAuthenticated ? (
+                  <div className="flex justify-center gap-4">
+                    <Button 
+                      onClick={() => setShowLinkSettings(true)}
+                      className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white font-semibold px-8 py-4 text-lg rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl flex items-center gap-3 border-0"
+                    >
+                      Generate Share Link
+                      <ArrowRight className="w-5 h-5 animate-pulse" />
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.location.href = '/download'}
+                      className="border-2 border-teal-600 text-teal-600 hover:bg-teal-600 hover:text-white font-semibold px-8 py-4 text-lg rounded-xl transition-all duration-300 hover:scale-105"
+                    >
+                      View Downloads
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center space-y-4">
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Sign in to generate share links and access advanced features
+                    </p>
+                    <div className="flex justify-center gap-4">
+                      <Button 
+                        onClick={() => window.location.href = '/login'}
+                        className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white font-semibold px-8 py-4 text-lg rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl flex items-center gap-3 border-0"
+                      >
+                        Sign In
+                        <ArrowRight className="w-5 h-5 animate-pulse" />
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => window.location.href = '/signup'}
+                        className="border-2 border-teal-600 text-teal-600 hover:bg-teal-600 hover:text-white font-semibold px-8 py-4 text-lg rounded-xl transition-all duration-300 hover:scale-105"
+                      >
+                        Sign Up
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -267,94 +297,28 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-gradient-to-br from-gray-50 via-teal-50/30 to-blue-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 relative overflow-hidden">
+      {/* Pricing CTA Section */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 via-teal-50/30 to-blue-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-20 right-20 w-40 h-40 bg-gradient-to-br from-teal-400/10 to-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-20 left-20 w-32 h-32 bg-gradient-to-br from-purple-400/10 to-pink-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }}></div>
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center mb-16">
+          <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 animate-fade-in">
-              Simple, Transparent Pricing
+              Ready to Upgrade?
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 animate-slide-up">
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 animate-slide-up">
               Choose the perfect plan for your file sharing needs. Upgrade or downgrade at any time.
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-            {pricingPlans.map((plan, index) => (
-              <Card 
-                key={index}
-                className={`relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${
-                  plan.popular 
-                    ? 'border-2 border-teal-500 shadow-2xl scale-105 bg-white/95 dark:bg-gray-800/95' 
-                    : 'border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80'
-                } backdrop-blur-xl animate-scale-in`}
-                style={{ animationDelay: `${index * 0.2}s` }}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-gradient-to-r from-teal-500 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg">
-                      <Star className="w-4 h-4 fill-current" />
-                      Most Popular
-                    </div>
-                  </div>
-                )}
-                
-                <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                
-                <CardHeader className="text-center relative z-10 pt-8">
-                  <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {plan.name}
-                  </CardTitle>
-                  <div className="mb-4">
-                    <span className="text-5xl font-bold text-gray-900 dark:text-white">${plan.price}</span>
-                    <span className="text-gray-500 dark:text-gray-400">/{plan.period}</span>
-                  </div>
-                  <CardDescription className="text-gray-600 dark:text-gray-300 text-lg">
-                    {plan.description}
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="relative z-10">
-                  <ul className="space-y-4">
-                    {plan.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                        <span className="text-gray-700 dark:text-gray-300">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-
-                <CardFooter className="relative z-10">
-                  <Button 
-                    variant={plan.buttonVariant}
-                    className={`w-full py-3 text-lg font-semibold transition-all duration-300 hover:scale-105 ${
-                      plan.popular 
-                        ? 'bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white shadow-lg' 
-                        : ''
-                    }`}
-                  >
-                    {plan.buttonText}
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              All plans include our core security features and 24/7 uptime guarantee.
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500">
-              Need a custom solution? <a href="#" className="text-teal-600 hover:text-teal-500 font-medium">Contact our sales team</a>
-            </p>
+            <Button 
+              size="lg"
+              className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white font-bold px-10 py-5 text-xl rounded-xl transition-all duration-300 hover:scale-105 shadow-2xl"
+              onClick={() => window.location.href = '/pricing'}
+            >
+              View Pricing Plans
+            </Button>
           </div>
         </div>
       </section>
@@ -383,11 +347,10 @@ const Index = () => {
         </div>
       </section>
 
-      <Footer />
-
       <LinkSettings 
         isOpen={showLinkSettings} 
-        onClose={() => setShowLinkSettings(false)} 
+        onClose={() => setShowLinkSettings(false)}
+        uploadedFiles={uploadedFiles}
       />
     </div>
   );
