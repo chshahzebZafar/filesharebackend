@@ -5,6 +5,25 @@ interface User {
   name?: string;
   plan?: string;
   planExpiry?: string;
+  avatar?: string;
+  preferences?: {
+    theme: 'light' | 'dark' | 'auto';
+    language: string;
+    notifications: boolean;
+    autoDownload: boolean;
+    defaultPrivacy: 'public' | 'private';
+  };
+  stats?: {
+    totalUploads: number;
+    totalDownloads: number;
+    totalShares: number;
+    storageUsed: number;
+    storageLimit: number;
+  };
+  onboarding?: {
+    completed: boolean;
+    steps: string[];
+  };
 }
 
 interface AuthContextType {
@@ -15,6 +34,10 @@ interface AuthContextType {
   loading: boolean;
   updateUserPlan: (plan: string) => void;
   getCurrentPlan: () => string;
+  updateUserPreferences: (preferences: Partial<User['preferences']>) => void;
+  updateUserStats: (stats: Partial<User['stats']>) => void;
+  completeOnboardingStep: (step: string) => void;
+  isOnboardingComplete: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +65,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const userName = localStorage.getItem('userName');
     const userPlan = localStorage.getItem('userPlan') || 'free';
     const planExpiry = localStorage.getItem('planExpiry');
+    const userAvatar = localStorage.getItem('userAvatar');
+    const userPreferences = localStorage.getItem('userPreferences');
+    const userStats = localStorage.getItem('userStats');
+    const userOnboarding = localStorage.getItem('userOnboarding');
 
     if (isAuthenticated && userEmail) {
       setUser({
@@ -49,6 +76,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         name: userName || undefined,
         plan: userPlan,
         planExpiry: planExpiry || undefined,
+        avatar: userAvatar || undefined,
+        preferences: userPreferences ? JSON.parse(userPreferences) : {
+          theme: 'auto',
+          language: 'en',
+          notifications: true,
+          autoDownload: false,
+          defaultPrivacy: 'private'
+        },
+        stats: userStats ? JSON.parse(userStats) : {
+          totalUploads: 0,
+          totalDownloads: 0,
+          totalShares: 0,
+          storageUsed: 0,
+          storageLimit: 2 * 1024 * 1024 * 1024 // 2GB
+        },
+        onboarding: userOnboarding ? JSON.parse(userOnboarding) : {
+          completed: false,
+          steps: []
+        }
       });
     }
     
@@ -56,18 +102,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = (email: string, name?: string) => {
-    const userData = { 
+    const userData: User = { 
       email, 
       name,
       plan: localStorage.getItem('userPlan') || 'free',
       planExpiry: localStorage.getItem('planExpiry') || undefined,
+      avatar: localStorage.getItem('userAvatar') || undefined,
+      preferences: {
+        theme: 'auto',
+        language: 'en',
+        notifications: true,
+        autoDownload: false,
+        defaultPrivacy: 'private'
+      },
+      stats: {
+        totalUploads: 0,
+        totalDownloads: 0,
+        totalShares: 0,
+        storageUsed: 0,
+        storageLimit: 2 * 1024 * 1024 * 1024 // 2GB
+      },
+      onboarding: {
+        completed: false,
+        steps: []
+      }
     };
+    
     setUser(userData);
     localStorage.setItem('isAuthenticated', 'true');
     localStorage.setItem('userEmail', email);
     if (name) {
       localStorage.setItem('userName', name);
     }
+    localStorage.setItem('userPreferences', JSON.stringify(userData.preferences));
+    localStorage.setItem('userStats', JSON.stringify(userData.stats));
+    localStorage.setItem('userOnboarding', JSON.stringify(userData.onboarding));
   };
 
   const logout = () => {
@@ -77,6 +146,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('userName');
     localStorage.removeItem('userPlan');
     localStorage.removeItem('planExpiry');
+    localStorage.removeItem('userAvatar');
+    localStorage.removeItem('userPreferences');
+    localStorage.removeItem('userStats');
+    localStorage.removeItem('userOnboarding');
   };
 
   const updateUserPlan = (plan: string) => {
@@ -94,6 +167,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('planExpiry', expiryDate.toISOString());
   };
 
+  const updateUserPreferences = (preferences: Partial<User['preferences']>) => {
+    if (!user) return;
+    
+    const updatedPreferences = { ...user.preferences, ...preferences };
+    const updatedUser = { ...user, preferences: updatedPreferences };
+    
+    setUser(updatedUser);
+    localStorage.setItem('userPreferences', JSON.stringify(updatedPreferences));
+  };
+
+  const updateUserStats = (stats: Partial<User['stats']>) => {
+    if (!user) return;
+    
+    const updatedStats = { ...user.stats, ...stats };
+    const updatedUser = { ...user, stats: updatedStats };
+    
+    setUser(updatedUser);
+    localStorage.setItem('userStats', JSON.stringify(updatedStats));
+  };
+
+  const completeOnboardingStep = (step: string) => {
+    if (!user) return;
+    
+    const updatedSteps = [...(user.onboarding?.steps || []), step];
+    const updatedOnboarding = {
+      ...user.onboarding,
+      steps: updatedSteps,
+      completed: updatedSteps.length >= 3 // Mark as complete after 3 steps
+    };
+    
+    const updatedUser = { ...user, onboarding: updatedOnboarding };
+    setUser(updatedUser);
+    localStorage.setItem('userOnboarding', JSON.stringify(updatedOnboarding));
+  };
+
+  const isOnboardingComplete = () => {
+    return user?.onboarding?.completed || false;
+  };
+
   const getCurrentPlan = () => {
     return user?.plan || localStorage.getItem('userPlan') || 'free';
   };
@@ -106,6 +218,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     updateUserPlan,
     getCurrentPlan,
+    updateUserPreferences,
+    updateUserStats,
+    completeOnboardingStep,
+    isOnboardingComplete,
   };
 
   return (

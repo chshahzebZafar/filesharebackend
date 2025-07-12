@@ -16,6 +16,11 @@ import Signup from './pages/Signup';
 import Stats from './pages/Stats';
 import History from './pages/History';
 import Settings from './pages/Settings';
+import Features from './pages/Features';
+import AdvancedFileManager from './components/AdvancedFileManager';
+import AIFileAnalyzer from './components/AIFileAnalyzer';
+import RealTimeCollaboration from './components/RealTimeCollaboration';
+import AdvancedAnalytics from './components/AdvancedAnalytics';
 import './App.css';
 
 const App = () => {
@@ -30,6 +35,7 @@ const App = () => {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/features" element={<Features />} />
               <Route path="/download" element={<Download />} />
               <Route path="/share/:shareId" element={<Share />} />
               <Route path="/login" element={<Login />} />
@@ -37,6 +43,11 @@ const App = () => {
               <Route path="/stats" element={<Stats />} />
               <Route path="/history" element={<History />} />
               <Route path="/settings" element={<Settings />} />
+              {/* Advanced Features Routes */}
+              <Route path="/file-manager" element={<AdvancedFileManager />} />
+              <Route path="/ai-analyzer" element={<AIFileAnalyzer />} />
+              <Route path="/collaboration" element={<RealTimeCollaboration />} />
+              <Route path="/analytics" element={<AdvancedAnalytics />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Shield, Zap, Globe, ArrowRight, CheckCircle, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Zap, Globe, ArrowRight, CheckCircle, Check, Sparkles, TrendingUp, Users, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import FileUpload from '@/components/FileUpload';
 import LinkSettings from '@/components/LinkSettings';
+import Onboarding from '@/components/Onboarding';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService } from '@/services/api';
 
@@ -21,7 +22,38 @@ const Index = () => {
   const [showLinkSettings, setShowLinkSettings] = useState(false);
   const [storageUsed, setStorageUsed] = useState(0);
   const [storageLimit] = useState(2 * 1024 * 1024 * 1024); // 2GB in bytes
-  const { isAuthenticated, user } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [globalStats, setGlobalStats] = useState({
+    totalFiles: 0,
+    totalTransfers: 0,
+    totalSize: 0
+  });
+  const { isAuthenticated, user, updateUserStats, isOnboardingComplete } = useAuth();
+
+  useEffect(() => {
+    // Load global stats
+    loadGlobalStats();
+    
+    // Check if user needs onboarding
+    if (isAuthenticated && !isOnboardingComplete()) {
+      setShowOnboarding(true);
+    }
+  }, [isAuthenticated, isOnboardingComplete]);
+
+  const loadGlobalStats = async () => {
+    try {
+      const stats = await apiService.getUploadStats();
+      if (stats.success) {
+        setGlobalStats({
+          totalFiles: stats.stats.totalFiles,
+          totalTransfers: stats.stats.totalShares,
+          totalSize: stats.stats.totalSize
+        });
+      }
+    } catch (error) {
+      console.error('Error loading global stats:', error);
+    }
+  };
 
   const handleFilesUploaded = (files: UploadedFile[]) => {
     setUploadedFiles(files);
@@ -30,6 +62,14 @@ const Index = () => {
     // Calculate total storage used
     const totalSize = files.reduce((sum, file) => sum + file.size, 0);
     setStorageUsed(totalSize);
+    
+    // Update user stats if authenticated
+    if (isAuthenticated && user) {
+      updateUserStats({
+        totalUploads: (user.stats?.totalUploads || 0) + files.length,
+        storageUsed: (user.stats?.storageUsed || 0) + totalSize
+      });
+    }
     
     // Save to localStorage for persistence
     localStorage.setItem('uploadedFiles', JSON.stringify(files));
@@ -65,16 +105,20 @@ const Index = () => {
     }
   ];
 
-
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-teal-50/30 to-blue-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      
       {/* Enhanced Hero Section */}
       <section className="relative py-20 overflow-hidden">
         {/* Animated Background */}
         <div className="absolute inset-0">
-          {/* Primary gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-blue-500/5 to-purple-500/10 dark:from-teal-500/5 dark:via-blue-500/5 dark:to-purple-500/5 animate-pulse"></div>
           
           {/* Floating geometric shapes */}
@@ -135,10 +179,6 @@ const Index = () => {
               <span className="text-lg">No registration required. Just upload, share, and download.</span>
             </p>
 
-
-
-
-
             {/* Enhanced feature badges */}
             <div className="flex flex-wrap justify-center gap-4 mb-8 animate-slide-up" style={{ animationDelay: '0.6s' }}>
               <div className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full border border-teal-200 dark:border-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
@@ -154,15 +194,37 @@ const Index = () => {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Global Access</span>
               </div>
             </div>
+
+            {/* Global Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-slide-up" style={{ animationDelay: '0.8s' }}>
+              <div className="text-center p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-white/20 dark:border-gray-700/20">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                  {globalStats.totalFiles.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Files Shared</div>
+              </div>
+              <div className="text-center p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-white/20 dark:border-gray-700/20">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                  {globalStats.totalTransfers.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Total Transfers</div>
+              </div>
+              <div className="text-center p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-white/20 dark:border-gray-700/20">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                  {formatBytes(globalStats.totalSize)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Data Transferred</div>
+              </div>
+            </div>
           </div>
 
           {/* Storage Indicator */}
-          <div className="max-w-2xl mx-auto mb-6 animate-slide-up" style={{ animationDelay: '0.8s' }}>
+          <div className="max-w-2xl mx-auto mb-6 animate-slide-up" style={{ animationDelay: '0.9s' }}>
             <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/20 dark:border-gray-700/20">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Storage Used</span>
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {(storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB / 2 GB
+                  {formatBytes(storageUsed)} / {formatBytes(storageLimit)}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -175,7 +237,7 @@ const Index = () => {
                 ></div>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {((storageLimit - storageUsed) / (1024 * 1024 * 1024)).toFixed(2)} GB remaining
+                {formatBytes(storageLimit - storageUsed)} remaining
               </p>
             </div>
           </div>
@@ -186,7 +248,7 @@ const Index = () => {
             <FileUpload 
               onFilesUploaded={handleFilesUploaded} 
               onFileRemoved={handleFileRemoved}
-              oneTimeDownload={false} // This will be controlled by LinkSettings
+              oneTimeDownload={false}
             />
           </div>
 
@@ -351,6 +413,11 @@ const Index = () => {
         isOpen={showLinkSettings} 
         onClose={() => setShowLinkSettings(false)}
         uploadedFiles={uploadedFiles}
+      />
+
+      <Onboarding 
+        isOpen={showOnboarding} 
+        onClose={() => setShowOnboarding(false)}
       />
     </div>
   );

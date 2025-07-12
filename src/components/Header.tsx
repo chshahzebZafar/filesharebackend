@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Share2, LogOut, User, BarChart3, History, Download, Settings as SettingsIcon, Crown, ChevronDown } from 'lucide-react';
+import { Share2, LogOut, User, BarChart3, History, Download, Settings as SettingsIcon, Crown, ChevronDown, Zap, Users, FolderOpen, Brain, MessageSquare, TrendingUp } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +8,7 @@ import ThemeToggle from './ThemeToggle';
 
 const Header: React.FC = () => {
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, getCurrentPlan } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -38,6 +38,36 @@ const Header: React.FC = () => {
     };
   }, [showUserMenu]);
 
+  const getPlanBadge = () => {
+    const currentPlan = getCurrentPlan();
+    
+    switch (currentPlan) {
+      case 'pro':
+        return {
+          icon: <Crown className="w-3 h-3" />,
+          text: 'Pro Plan',
+          gradient: 'from-teal-400 to-blue-500',
+          color: 'text-white'
+        };
+      case 'business':
+        return {
+          icon: <Users className="w-3 h-3" />,
+          text: 'Business Plan',
+          gradient: 'from-purple-400 to-pink-500',
+          color: 'text-white'
+        };
+      default:
+        return {
+          icon: <Zap className="w-3 h-3" />,
+          text: 'Free Plan',
+          gradient: 'from-yellow-400 to-orange-500',
+          color: 'text-white'
+        };
+    }
+  };
+
+  const planBadge = getPlanBadge();
+
   return (
     <header className="w-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -64,6 +94,50 @@ const Header: React.FC = () => {
           
           {isAuthenticated ? (
             <>
+              <Link 
+                to="/file-manager" 
+                className={`transition-colors duration-200 flex items-center gap-1 ${
+                  isActive('/file-manager') 
+                    ? 'text-teal-600 dark:text-teal-400' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
+                }`}
+              >
+                <FolderOpen className="w-4 h-4" />
+                Files
+              </Link>
+              <Link 
+                to="/ai-analyzer" 
+                className={`transition-colors duration-200 flex items-center gap-1 ${
+                  isActive('/ai-analyzer') 
+                    ? 'text-teal-600 dark:text-teal-400' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                AI Analysis
+              </Link>
+              <Link 
+                to="/collaboration" 
+                className={`transition-colors duration-200 flex items-center gap-1 ${
+                  isActive('/collaboration') 
+                    ? 'text-teal-600 dark:text-teal-400' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                Collaborate
+              </Link>
+              <Link 
+                to="/analytics" 
+                className={`transition-colors duration-200 flex items-center gap-1 ${
+                  isActive('/analytics') 
+                    ? 'text-teal-600 dark:text-teal-400' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                Analytics
+              </Link>
               <Link 
                 to="/stats" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
@@ -150,9 +224,9 @@ const Header: React.FC = () => {
             <div className="flex items-center space-x-3">
               {/* Plan Badge */}
               <Link to="/pricing">
-                <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-medium rounded-full hover:scale-105 transition-transform">
-                  <Crown className="w-3 h-3" />
-                  <span className="hidden sm:inline">Free Plan</span>
+                <div className={`flex items-center gap-1 px-3 py-1 bg-gradient-to-r ${planBadge.gradient} ${planBadge.color} text-xs font-medium rounded-full hover:scale-105 transition-transform`}>
+                  {planBadge.icon}
+                  <span className="hidden sm:inline">{planBadge.text}</span>
                 </div>
               </Link>
               
@@ -172,6 +246,12 @@ const Header: React.FC = () => {
                     <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.name || 'User'}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r ${planBadge.gradient} ${planBadge.color}`}>
+                          {planBadge.icon}
+                          {planBadge.text}
+                        </span>
+                      </div>
                     </div>
                     
                     <Link 
@@ -193,15 +273,16 @@ const Header: React.FC = () => {
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      Upgrade Plan
+                      {getCurrentPlan() === 'free' ? 'Upgrade Plan' : 'Manage Plan'}
                     </Link>
                     
                     <div className="border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
                       <button
                         onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20"
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                       >
-                        Sign Out
+                        <LogOut className="w-4 h-4" />
+                        Logout
                       </button>
                     </div>
                   </div>
@@ -211,17 +292,18 @@ const Header: React.FC = () => {
           ) : (
             <div className="flex items-center space-x-2">
               <Link to="/login">
-                <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400">
-                  Sign In
+                <Button variant="outline" size="sm">
+                  Login
                 </Button>
               </Link>
               <Link to="/signup">
-                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Button size="sm" className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700">
                   Sign Up
                 </Button>
               </Link>
             </div>
           )}
+          
           <ThemeToggle />
         </div>
       </div>

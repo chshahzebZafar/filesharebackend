@@ -28,7 +28,6 @@ const History = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      // Mock history data
       const mockHistory: HistoryItem[] = [
         {
           id: '1',
