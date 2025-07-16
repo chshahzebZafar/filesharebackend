@@ -1,7 +1,31 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiService, AuthResponse, RegisterRequest, LoginRequest } from '@/services/api';
 
 interface User {
+  _id: string;
   email: string;
+  username: string;
+  firstName?: string;
+  lastName?: string;
+  isEmailVerified: boolean;
+  subscription: {
+    plan: string;
+    status: string;
+    features: string[];
+  };
+  storage: {
+    used: number;
+    limit: number;
+  };
+  settings?: {
+    theme: string;
+    language: string;
+    notifications: {
+      email: boolean;
+      push: boolean;
+    };
+  };
+  // Frontend-specific properties
   name?: string;
   plan?: string;
   planExpiry?: string;
@@ -29,7 +53,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, name?: string) => void;
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  register: (userData: RegisterRequest) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   loading: boolean;
   updateUserPlan: (plan: string) => void;
@@ -58,60 +83,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is authenticated on app load
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    const userEmail = localStorage.getItem('userEmail');
-    const userName = localStorage.getItem('userName');
-    const userPlan = localStorage.getItem('userPlan') || 'free';
-    const planExpiry = localStorage.getItem('planExpiry');
-    const userAvatar = localStorage.getItem('userAvatar');
-    const userPreferences = localStorage.getItem('userPreferences');
-    const userStats = localStorage.getItem('userStats');
-    const userOnboarding = localStorage.getItem('userOnboarding');
-
-    if (isAuthenticated && userEmail) {
-      setUser({
-        email: userEmail,
-        name: userName || undefined,
-        plan: userPlan,
-        planExpiry: planExpiry || undefined,
-        avatar: userAvatar || undefined,
-        preferences: userPreferences ? JSON.parse(userPreferences) : {
-          theme: 'auto',
-          language: 'en',
-          notifications: true,
-          autoDownload: false,
-          defaultPrivacy: 'private'
-        },
-        stats: userStats ? JSON.parse(userStats) : {
-          totalUploads: 0,
-          totalDownloads: 0,
-          totalShares: 0,
-          storageUsed: 0,
-          storageLimit: 2 * 1024 * 1024 * 1024 // 2GB
-        },
-        onboarding: userOnboarding ? JSON.parse(userOnboarding) : {
-          completed: false,
-          steps: []
-        }
-      });
-    }
-    
-    setLoading(false);
-  }, []);
-
-  const login = (email: string, name?: string) => {
-    const userData: User = { 
-      email, 
-      name,
-      plan: localStorage.getItem('userPlan') || 'free',
-      planExpiry: localStorage.getItem('planExpiry') || undefined,
-      avatar: localStorage.getItem('userAvatar') || undefined,
+  // Convert backend user data to frontend format
+  const convertBackendUser = (backendUser: any): User => {
+    return {
+      _id: backendUser._id,
+      email: backendUser.email,
+      username: backendUser.username,
+      firstName: backendUser.firstName,
+      lastName: backendUser.lastName,
+      isEmailVerified: backendUser.isEmailVerified,
+      subscription: backendUser.subscription,
+      storage: backendUser.storage,
+      settings: backendUser.settings,
+      // Frontend-specific properties with defaults
+      name: backendUser.firstName && backendUser.lastName 
+        ? `${backendUser.firstName} ${backendUser.lastName}` 
+        : backendUser.username,
+      plan: backendUser.subscription?.plan || 'free',
+      planExpiry: backendUser.subscription?.endDate,
+      avatar: undefined,
       preferences: {
-        theme: 'auto',
-        language: 'en',
-        notifications: true,
+        theme: backendUser.settings?.theme || 'auto',
+        language: backendUser.settings?.language || 'en',
+        notifications: backendUser.settings?.notifications?.email || true,
         autoDownload: false,
         defaultPrivacy: 'private'
       },
@@ -119,52 +113,101 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         totalUploads: 0,
         totalDownloads: 0,
         totalShares: 0,
-        storageUsed: 0,
-        storageLimit: 2 * 1024 * 1024 * 1024 // 2GB
+        storageUsed: backendUser.storage?.used || 0,
+        storageLimit: backendUser.storage?.limit || 2 * 1024 * 1024 * 1024
       },
       onboarding: {
         completed: false,
         steps: []
       }
     };
-    
-    setUser(userData);
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userEmail', email);
-    if (name) {
-      localStorage.setItem('userName', name);
-    }
-    localStorage.setItem('userPreferences', JSON.stringify(userData.preferences));
-    localStorage.setItem('userStats', JSON.stringify(userData.stats));
-    localStorage.setItem('userOnboarding', JSON.stringify(userData.onboarding));
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userPlan');
-    localStorage.removeItem('planExpiry');
-    localStorage.removeItem('userAvatar');
-    localStorage.removeItem('userPreferences');
-    localStorage.removeItem('userStats');
-    localStorage.removeItem('userOnboarding');
+  useEffect(() => {
+    // Check if user is authenticated on app load
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          // Try to get current user from backend
+          const response = await apiService.getCurrentUser();
+          if (response.success && response.data?.user) {
+            const userData = convertBackendUser(response.data.user);
+            setUser(userData);
+          } else {
+            // Token is invalid, clear it
+            localStorage.removeItem('authToken');
+          }
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        localStorage.removeItem('authToken');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiService.login({ email, password });
+      
+      if (response.success && response.data?.user) {
+        const userData = convertBackendUser(response.data.user);
+        setUser(userData);
+        return { success: true, message: response.message };
+      } else {
+        return { success: false, message: response.message };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, message: 'Login failed. Please try again.' };
+    }
+  };
+
+  const register = async (userData: RegisterRequest): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiService.register(userData);
+      
+      if (response.success && response.data?.user) {
+        const convertedUser = convertBackendUser(response.data.user);
+        setUser(convertedUser);
+        return { success: true, message: response.message };
+      } else {
+        return { success: false, message: response.message };
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { success: false, message: 'Registration failed. Please try again.' };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await apiService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('authToken');
+    }
   };
 
   const updateUserPlan = (plan: string) => {
-    const expiryDate = new Date();
-    expiryDate.setMonth(expiryDate.getMonth() + 1);
+    if (!user) return;
     
     const updatedUser = {
-      ...user!,
+      ...user,
       plan,
-      planExpiry: expiryDate.toISOString(),
+      subscription: {
+        ...user.subscription,
+        plan
+      }
     };
     
     setUser(updatedUser);
-    localStorage.setItem('userPlan', plan);
-    localStorage.setItem('planExpiry', expiryDate.toISOString());
   };
 
   const updateUserPreferences = (preferences: Partial<User['preferences']>) => {
@@ -174,7 +217,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const updatedUser = { ...user, preferences: updatedPreferences };
     
     setUser(updatedUser);
-    localStorage.setItem('userPreferences', JSON.stringify(updatedPreferences));
   };
 
   const updateUserStats = (stats: Partial<User['stats']>) => {
@@ -184,7 +226,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const updatedUser = { ...user, stats: updatedStats };
     
     setUser(updatedUser);
-    localStorage.setItem('userStats', JSON.stringify(updatedStats));
   };
 
   const completeOnboardingStep = (step: string) => {
@@ -199,7 +240,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     const updatedUser = { ...user, onboarding: updatedOnboarding };
     setUser(updatedUser);
-    localStorage.setItem('userOnboarding', JSON.stringify(updatedOnboarding));
   };
 
   const isOnboardingComplete = () => {
@@ -207,13 +247,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const getCurrentPlan = () => {
-    return user?.plan || localStorage.getItem('userPlan') || 'free';
+    return user?.plan || user?.subscription?.plan || 'free';
   };
 
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     login,
+    register,
     logout,
     loading,
     updateUserPlan,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -27,71 +27,34 @@ import './App.css';
 const App = () => {
   return (
     <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-background text-foreground flex flex-col">
-          <Header />
-          <main className="flex-1 w-full">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/features" element={<Features />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/share/:shareId" element={<Share />} />
-              
-              {/* Protected Routes - Require Authentication */}
-              <Route path="/download" element={
-                <ProtectedRoute>
-                  <Download />
-                </ProtectedRoute>
-              } />
-              <Route path="/stats" element={
-                <ProtectedRoute>
-                  <Stats />
-                </ProtectedRoute>
-              } />
-              <Route path="/history" element={
-                <ProtectedRoute>
-                  <History />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              
-              {/* Advanced Features Routes - All Protected */}
-              <Route path="/file-manager" element={
-                <ProtectedRoute>
-                  <AdvancedFileManager />
-                </ProtectedRoute>
-              } />
-              <Route path="/ai-analyzer" element={
-                <ProtectedRoute>
-                  <AIFileAnalyzer />
-                </ProtectedRoute>
-              } />
-              <Route path="/collaboration" element={
-                <ProtectedRoute>
-                  <RealTimeCollaboration />
-                </ProtectedRoute>
-              } />
-              <Route path="/analytics" element={
-                <ProtectedRoute>
-                  <AdvancedAnalytics />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-          <Footer />
-          <Toaster position="top-right" />
-        </div>
-      </Router>
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <Header />
+        <main className="flex-1 w-full">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/share/:shareId" element={<Share />} />
+            {/* Protected Routes - Require Authentication */}
+            <Route path="/download" element={<ProtectedRoute><Download /></ProtectedRoute>} />
+            <Route path="/stats" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            {/* Advanced Features Routes - All Protected */}
+            <Route path="/file-manager" element={<ProtectedRoute><AdvancedFileManager /></ProtectedRoute>} />
+            <Route path="/ai-analyzer" element={<ProtectedRoute><AIFileAnalyzer /></ProtectedRoute>} />
+            <Route path="/collaboration" element={<ProtectedRoute><RealTimeCollaboration /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute><AdvancedAnalytics /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
+        <Footer />
+        <Toaster position="top-right" />
+      </div>
     </AuthProvider>
   );
 };

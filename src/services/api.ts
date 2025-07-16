@@ -2,27 +2,57 @@
 // In production, replace the mock implementations with real API calls
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-export interface UploadResponse {
+export interface AuthResponse {
   success: boolean;
-  fileId: string;
-  shareId: string;
-  downloadUrl: string;
-  qrCode?: string;
-  message?: string;
+  message: string;
+  data?: {
+    user: {
+      _id: string;
+      email: string;
+      username: string;
+      firstName?: string;
+      lastName?: string;
+      isEmailVerified: boolean;
+      subscription: {
+        plan: string;
+        status: string;
+        features: string[];
+      };
+      storage: {
+        used: number;
+        limit: number;
+      };
+      settings?: {
+        theme: string;
+        language: string;
+        notifications: {
+          email: boolean;
+          push: boolean;
+        };
+      };
+    };
+    token: string;
+  };
 }
 
-export interface MultipleUploadResponse {
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface ApiResponse<T = any> {
   success: boolean;
-  files: Array<{
-    originalName: string;
-    fileId: string;
-    shareId: string;
-    downloadUrl: string;
-    qrCode?: string;
-    size: number;
-    error?: string;
-  }>;
   message: string;
+  data?: T;
+  errors?: any[];
 }
 
 export interface FileInfo {
@@ -50,13 +80,6 @@ export interface ErrorResponse {
   code?: string;
 }
 
-export interface UploadOptions {
-  password?: string;
-  expiryDays?: number;
-  maxDownloads?: number;
-  oneTimeDownload?: boolean;
-}
-
 class ApiService {
   private baseUrl: string;
 
@@ -64,138 +87,404 @@ class ApiService {
     this.baseUrl = API_BASE_URL;
   }
 
-  // Mock implementation - no real API calls
-  private generateMockShareId(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  // Get auth token from localStorage
+  private getAuthToken(): string | null {
+    return localStorage.getItem('authToken');
   }
 
-  private generateMockQRCode(): string {
-    return `data:image/svg+xml;base64,${btoa('<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="200" fill="white"/><text x="100" y="100" text-anchor="middle" dy=".3em" font-family="Arial" font-size="12">Mock QR Code</text></svg>')}`;
+  // Set auth token in localStorage
+  private setAuthToken(token: string): void {
+    localStorage.setItem('authToken', token);
   }
 
-  async uploadSingleFile(
-    file: File,
-    options: UploadOptions = {}
-  ): Promise<UploadResponse> {
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    let shareId = this.generateMockShareId();
-    
-    // Add one-time download identifier if enabled
-    if (options.oneTimeDownload) {
-      shareId = `one-time-${shareId}`;
-    }
-    
-    const downloadUrl = `${window.location.origin}/share/${shareId}`;
-    
-    return {
-      success: true,
-      fileId: Math.random().toString(36).substring(2, 15),
-      shareId,
-      downloadUrl,
-      qrCode: this.generateMockQRCode(),
-      message: 'File uploaded successfully (mock)'
+  // Remove auth token from localStorage
+  private removeAuthToken(): void {
+    localStorage.removeItem('authToken');
+  }
+
+  // Make authenticated API request
+  private async makeAuthenticatedRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const token = this.getAuthToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
     };
-  }
 
-  async uploadMultipleFiles(
-    files: File[],
-    options: UploadOptions = {}
-  ): Promise<MultipleUploadResponse> {
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Generate a single share ID for all files in the batch
-    let batchShareId = this.generateMockShareId();
-    
-    // Add one-time download identifier if enabled
-    if (options.oneTimeDownload) {
-      batchShareId = `one-time-${batchShareId}`;
-    }
-    
-    const batchDownloadUrl = `${window.location.origin}/share/${batchShareId}`;
-    
-    const uploadedFiles = files.map(file => {
-      return {
-        originalName: file.name,
-        fileId: Math.random().toString(36).substring(2, 15),
-        shareId: batchShareId, // Use the same share ID for all files
-        downloadUrl: batchDownloadUrl, // Use the same download URL for all files
-        qrCode: this.generateMockQRCode(),
-        size: file.size
-      };
+    return fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers,
     });
+  }
 
-    return {
-      success: true,
-      files: uploadedFiles,
-      message: `${files.length} files uploaded successfully (mock)`
-    };
+  // Real Authentication APIs
+  async register(userData: RegisterRequest): Promise<AuthResponse> {
+    try {
+      console.log('🔐 Attempting registration with:', { ...userData, password: '[HIDDEN]' });
+      console.log('🌐 API URL:', `${this.baseUrl}/auth/register`);
+      
+      const response = await fetch(`${this.baseUrl}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      console.log('📡 Registration response status:', response.status);
+      const data = await response.json();
+      console.log('📡 Registration response data:', data);
+
+      if (data.success && data.data?.token) {
+        this.setAuthToken(data.data.token);
+        console.log('✅ Registration successful, token stored');
+      } else {
+        console.log('❌ Registration failed:', data.message);
+        
+        // Handle validation errors
+        if (data.errors && Array.isArray(data.errors)) {
+          const errorMessages = data.errors.map((err: any) => err.msg).join(', ');
+          return {
+            success: false,
+            message: errorMessages,
+          };
+        }
+      }
+
+      return data;
+    } catch (error) {
+      console.error('🚨 Registration error:', error);
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+          success: false,
+          message: 'Unable to connect to server. Please check your internet connection and try again.',
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Registration failed. Please try again.',
+      };
+    }
+  }
+
+  async login(credentials: LoginRequest): Promise<AuthResponse> {
+    try {
+      console.log('🔐 Attempting login with:', { ...credentials, password: '[HIDDEN]' });
+      console.log('🌐 API URL:', `${this.baseUrl}/auth/login`);
+      
+      const response = await fetch(`${this.baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      console.log('📡 Login response status:', response.status);
+      const data = await response.json();
+      console.log('📡 Login response data:', data);
+
+      if (data.success && data.data?.token) {
+        this.setAuthToken(data.data.token);
+        console.log('✅ Login successful, token stored');
+      } else {
+        console.log('❌ Login failed:', data.message);
+        
+        // Handle validation errors
+        if (data.errors && Array.isArray(data.errors)) {
+          const errorMessages = data.errors.map((err: any) => err.msg).join(', ');
+          return {
+            success: false,
+            message: errorMessages,
+          };
+        }
+      }
+
+      return data;
+    } catch (error) {
+      console.error('🚨 Login error:', error);
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+          success: false,
+          message: 'Unable to connect to server. Please check your internet connection and try again.',
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Login failed. Please check your credentials and try again.',
+      };
+    }
+  }
+
+  async getCurrentUser(): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.makeAuthenticatedRequest('/auth/me');
+      const data = await response.json();
+
+      if (!response.ok) {
+        // If token is invalid, remove it
+        if (response.status === 401) {
+          this.removeAuthToken();
+        }
+        return {
+          success: false,
+          message: data.message || 'Failed to get user data',
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get current user error:', error);
+      return {
+        success: false,
+        message: 'Failed to get user data',
+      };
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await this.makeAuthenticatedRequest('/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      this.removeAuthToken();
+    }
+  }
+
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      return { success: data.success, message: data.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to send reset email. Please try again.',
+      };
+    }
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await response.json();
+      return { success: data.success, message: data.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to reset password. Please try again.',
+      };
+    }
+  }
+
+  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/verify-email?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      return { success: data.success, message: data.message };
+    } catch (error) {
+      return { success: false, message: 'Failed to verify email. Please try again.' };
+    }
+  }
+
+  async resendVerification(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.makeAuthenticatedRequest('/auth/resend-verification', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      return { success: data.success, message: data.message };
+    } catch (error) {
+      return { success: false, message: 'Failed to resend verification email. Please try again.' };
+    }
+  }
+
+  async updateProfile(profileData: { firstName?: string; lastName?: string; avatar?: string }): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const response = await this.makeAuthenticatedRequest('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(profileData),
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { success: false, message: 'Failed to update profile.' };
+    }
+  }
+
+  async updateSettings(settingsData: { theme?: string; language?: string; notifications?: { email?: boolean; push?: boolean } }): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const response = await this.makeAuthenticatedRequest('/auth/settings', {
+        method: 'PUT',
+        body: JSON.stringify(settingsData),
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return { success: false, message: 'Failed to update settings.' };
+    }
+  }
+
+  // Health check for API availability
+  async healthCheck(): Promise<{ status: string; timestamp: string; uptime: number }> {
+    try {
+      console.log('🏥 Checking backend health at:', `${this.baseUrl.replace('/api', '')}/health`);
+      const response = await fetch(`${this.baseUrl.replace('/api', '')}/health`);
+      const data = await response.json();
+      console.log('🏥 Backend health response:', data);
+      return data;
+    } catch (error) {
+      console.error('🚨 Backend health check failed:', error);
+      // Return mock health data if API is not available
+      return {
+        status: 'mock',
+        timestamp: new Date().toISOString(),
+        uptime: 0
+      };
+    }
+  }
+
+  // Test backend connection
+  async testBackendConnection(): Promise<{ connected: boolean; message: string }> {
+    try {
+      console.log('🔍 Testing backend connection...');
+      const healthData = await this.healthCheck();
+      
+      if (healthData.status === 'mock') {
+        return {
+          connected: false,
+          message: 'Backend server is not running. Please start the backend server first.'
+        };
+      }
+      
+      return {
+        connected: true,
+        message: `Backend is running (${healthData.status})`
+      };
+    } catch (error) {
+      console.error('🚨 Backend connection test failed:', error);
+      return {
+        connected: false,
+        message: 'Cannot connect to backend server. Please check if the server is running.'
+      };
+    }
   }
 
   async getFileInfo(shareId: string): Promise<DownloadResponse> {
-    // Mock file info with more realistic data
-    const mockFiles = [
-      {
-        originalName: 'document.pdf',
-        filename: 'document.pdf',
-        size: 2048576, // 2MB
-        mimeType: 'application/pdf'
-      },
-      {
-        originalName: 'image.jpg',
-        filename: 'image.jpg',
-        size: 1048576, // 1MB
-        mimeType: 'image/jpeg'
-      },
-      {
-        originalName: 'presentation.pptx',
-        filename: 'presentation.pptx',
-        size: 5242880, // 5MB
-        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-      },
-      {
-        originalName: 'video.mp4',
-        filename: 'video.mp4',
-        size: 15728640, // 15MB
-        mimeType: 'video/mp4'
+    try {
+      console.log('📄 Getting file info for share:', shareId);
+      console.log('🌐 API URL:', `${this.baseUrl}/share/public/${shareId}`);
+      
+      const response = await fetch(`${this.baseUrl}/share/public/${shareId}`);
+      console.log('📡 File info response status:', response.status);
+      
+      const data = await response.json();
+      console.log('📡 File info response data:', data);
+
+      if (data.success && data.data?.share?.resource) {
+        const file = data.data.share.resource;
+        return {
+          success: true,
+          file: {
+            id: file._id,
+            originalName: file.originalName,
+            filename: file.name,
+            size: file.size,
+            mimeType: file.mimeType,
+            uploadDate: file.createdAt,
+            expiryDate: data.data.share.access.expiresAt,
+            downloadCount: data.data.share.access.downloadCount,
+            maxDownloads: data.data.share.access.maxDownloads,
+            isEncrypted: false
+          }
+        };
       }
-    ];
-    
-    const randomFile = mockFiles[Math.floor(Math.random() * mockFiles.length)];
-    
-    // Check if this is a one-time download (simulate by checking shareId pattern)
-    const isOneTimeDownload = shareId.includes('one-time') || Math.random() < 0.3;
-    
-    return {
-      success: true,
-      file: {
-        id: shareId,
-        originalName: randomFile.originalName,
-        filename: randomFile.filename,
-        size: randomFile.size,
-        mimeType: randomFile.mimeType,
-        uploadDate: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        downloadCount: Math.floor(Math.random() * 5),
-        maxDownloads: isOneTimeDownload ? 1 : 10,
-        isEncrypted: false
-      }
-    };
+
+      return {
+        success: false,
+        message: data.message || 'File not found'
+      };
+    } catch (error) {
+      console.error('🚨 Get file info error:', error);
+      return {
+        success: false,
+        message: 'Failed to get file information'
+      };
+    }
   }
 
   async checkPasswordRequired(shareId: string): Promise<{ success: boolean; requiresPassword: boolean }> {
-    return {
-      success: true,
-      requiresPassword: false
-    };
+    try {
+      const response = await fetch(`${this.baseUrl}/share/public/${shareId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        return {
+          success: true,
+          requiresPassword: data.data.share.access.type === 'password'
+        };
+      }
+
+      return {
+        success: false,
+        requiresPassword: false
+      };
+    } catch (error) {
+      console.error('🚨 Check password required error:', error);
+      return {
+        success: false,
+        requiresPassword: false
+      };
+    }
   }
 
   async downloadFile(shareId: string, password?: string): Promise<Blob> {
-    // Mock download - return a simple text blob
-    const mockContent = `This is a mock file download for share ID: ${shareId}\n\nThis is a demonstration of the file transfer application. In a real implementation, this would be the actual file content.`;
-    return new Blob([mockContent], { type: 'text/plain' });
+    try {
+      console.log('📥 Downloading file from share:', shareId);
+      
+      let url = `${this.baseUrl}/download/share/${shareId}`;
+      if (password) {
+        url += `?password=${encodeURIComponent(password)}`;
+      }
+
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      console.log('✅ File downloaded successfully:', blob.size, 'bytes');
+      
+      return blob;
+    } catch (error) {
+      console.error('🚨 File download error:', error);
+      throw error;
+    }
   }
 
   async getUploadStats(): Promise<{ success: boolean; stats: { totalFiles: number; totalSize: number; totalShares: number } }> {

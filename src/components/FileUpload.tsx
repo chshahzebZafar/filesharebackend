@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { apiService, UploadResponse, MultipleUploadResponse } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UploadedFile {
   id: string;
@@ -30,6 +31,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded, onFileRemoved,
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return Image;
@@ -197,6 +199,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded, onFileRemoved,
       });
     }
   };
+
+  // Add restriction for unverified users
+  if (user && !user.isEmailVerified) {
+    return (
+      <div className="p-6 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-center">
+        <p className="mb-2 font-semibold">Email Verification Required</p>
+        <p className="mb-4">You must verify your email address before uploading files. Please check your inbox for a verification link.</p>
+        <Button disabled className="opacity-60 cursor-not-allowed">Upload Disabled</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">

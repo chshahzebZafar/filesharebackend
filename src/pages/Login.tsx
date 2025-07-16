@@ -39,23 +39,29 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Simulate login API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Use auth context to login with real API
+      const result = await login(email, password);
       
-      // Use auth context to login
-      login(email);
-      
-      toast({
-        title: "Login successful!",
-        description: "Welcome back!",
-      });
+      if (result.success) {
+        toast({
+          title: "Login successful!",
+          description: "Welcome back!",
+        });
 
-      // Redirect to the original destination or home
-      navigate(redirectTo, { replace: true });
+        // Redirect to the original destination or home
+        navigate(redirectTo, { replace: true });
+      } else {
+        toast({
+          title: "Login failed",
+          description: result.message || "Invalid email or password. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
-        description: "Invalid email or password. Please try again.",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -126,6 +132,9 @@ const Login = () => {
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
+                </div>
+                <div className="text-right mt-1">
+                  <Link to="/forgot-password" className="text-sm text-teal-600 dark:text-teal-400 hover:underline">Forgot Password?</Link>
                 </div>
               </div>
 
