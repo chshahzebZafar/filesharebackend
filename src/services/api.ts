@@ -1,6 +1,6 @@
 // NOTE: This API service is currently using mock data for demonstration purposes
 // In production, replace the mock implementations with real API calls
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// const API_BASE_URL = 'http://localhost:3001/api';
 
 export interface AuthResponse {
   success: boolean;
@@ -84,7 +84,7 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_BASE_URL;
+    this.baseUrl = 'http://localhost:3001/api';
   }
 
   // Get auth token from localStorage
@@ -140,8 +140,6 @@ class ApiService {
         console.log('✅ Registration successful, token stored');
       } else {
         console.log('❌ Registration failed:', data.message);
-        
-        // Handle validation errors
         if (data.errors && Array.isArray(data.errors)) {
           const errorMessages = data.errors.map((err: any) => err.msg).join(', ');
           return {
@@ -498,13 +496,84 @@ class ApiService {
     };
   }
 
-  getDownloadUrl(shareId: string, password?: string): string {
-    const url = new URL(`${window.location.origin}/share/${shareId}`);
-    if (password) {
-      url.searchParams.append('password', password);
-    }
-    return url.toString();
+  /**
+   * Upload multiple files with options (public, password, maxDownloads, expiresAt, tags, etc.)
+   * @param files Array of File objects
+   * @param options { public, password, maxDownloads, expiresAt, tags, bundleName }
+   */
+  async uploadMultipleFiles(
+    files: File[],
+    options: {
+      public?: boolean;
+      password?: string;
+      maxDownloads?: number;
+      expiresAt?: string;
+      tags?: string[];
+      bundleName?: string;
+    } = {}
+  ): Promise<any> {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+    if (options.public !== undefined) formData.append('public', String(options.public));
+    if (options.password) formData.append('password', options.password);
+    if (options.maxDownloads !== undefined) formData.append('maxDownloads', String(options.maxDownloads));
+    if (options.expiresAt) formData.append('expiresAt', options.expiresAt);
+    if (options.tags && options.tags.length > 0) formData.append('tags', JSON.stringify(options.tags));
+    if (options.bundleName) formData.append('bundleName', options.bundleName);
+
+    const token = this.getAuthToken();
+    const response = await fetch(`${this.baseUrl}/upload/multiple`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    
+    const data = await response.json();
+    console.log('🚀 ~ ApiService Response ~ uploadMultipleFiles ~ data:', data);
+    return data.data || data;
   }
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+export function uploadFilesWithProgress(
+  formData: FormData,
+  onProgress: (percent: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE_URL}/upload/multiple`, true);
+    xhr.withCredentials = true;
+
+    // Attach JWT token if present
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        resolve(data);
+      } catch (e) {
+        reject(e);
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Upload failed'));
+    xhr.send(formData);
+  });
 }
 
 export const apiService = new ApiService(); 

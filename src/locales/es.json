@@ -1,0 +1,34 @@
+{
+  "common": {
+    "upload": "Subir Archivos",
+    "download": "Descargar",
+    "share": "Compartir",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión",
+    "login": "Iniciar sesión",
+    "signup": "Registrarse"
+  },
+  "home": {
+    "hero": {
+      "title": "Comparte Archivos Instantáneamente",
+      "subtitle": "Envía archivos de hasta 2GB de forma rápida y segura."
+    },
+    "features": {
+      "secure": "Seguro y Privado",
+      "secureDesc": "El cifrado de extremo a extremo garantiza que tus archivos estén protegidos durante la transferencia y almacenamiento.",
+      "fast": "Súper Rápido",
+      "fastDesc": "Sube y comparte archivos de hasta 2GB con nuestra infraestructura optimizada.",
+      "global": "Comparte en Cualquier Lugar",
+      "globalDesc": "Genera enlaces seguros y códigos QR para compartir archivos en cualquier dispositivo o plataforma."
+    },
+    "map": {
+      "title": "Actividad Global de Usuarios",
+      "subtitle": "Usuarios en vivo alrededor del mundo",
+      "activeUsers": "Usuarios Activos",
+      "lastActive": "Última actividad",
+      "countries": "Países",
+      "highestActivity": "Mayor Actividad",
+      "averageUsers": "Promedio por País"
+    }
+  }
+} 

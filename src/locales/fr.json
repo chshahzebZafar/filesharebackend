@@ -1,0 +1,41 @@
+{
+  "common": {
+    "upload": "Télécharger des fichiers",
+    "download": "Télécharger",
+    "share": "Partager",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "login": "Connexion",
+    "signup": "S'inscrire",
+    "home": "Accueil",
+    "files": "Fichiers",
+    "stats": "Statistiques",
+    "history": "Historique",
+    "pricing": "Tarifs",
+    "about": "À propos",
+    "contact": "Contact"
+  },
+  "home": {
+    "hero": {
+      "title": "Partagez des Fichiers Instantanément",
+      "subtitle": "Envoyez des fichiers jusqu'à 2GB rapidement et en toute sécurité."
+    },
+    "features": {
+      "secure": "Sécurisé et Privé",
+      "secureDesc": "Le chiffrement de bout en bout garantit que vos fichiers sont protégés pendant le transfert et le stockage.",
+      "fast": "Ultra Rapide",
+      "fastDesc": "Téléchargez et partagez des fichiers jusqu'à 2GB avec notre infrastructure optimisée.",
+      "global": "Partagez Partout",
+      "globalDesc": "Générez des liens sécurisés et des codes QR pour partager des fichiers sur n'importe quel appareil ou plateforme."
+    },
+    "map": {
+      "title": "Activité Utilisateur Mondiale",
+      "subtitle": "Utilisateurs en direct dans le monde entier",
+      "activeUsers": "Utilisateurs Actifs",
+      "lastActive": "Dernière activité",
+      "countries": "Pays",
+      "highestActivity": "Activité la Plus Élevée",
+      "averageUsers": "Moyenne par Pays"
+    }
+  }
+} 

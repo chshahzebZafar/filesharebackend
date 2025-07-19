@@ -1,0 +1,34 @@
+{
+  "common": {
+    "upload": "Upload Files",
+    "download": "Download",
+    "share": "Share",
+    "settings": "Settings",
+    "logout": "Logout",
+    "login": "Login",
+    "signup": "Sign Up"
+  },
+  "home": {
+    "hero": {
+      "title": "Share Files Instantly",
+      "subtitle": "Send files up to 2GB quickly and securely."
+    },
+    "features": {
+      "secure": "Secure & Private",
+      "secureDesc": "End-to-end encryption ensures your files are protected during transfer and storage.",
+      "fast": "Lightning Fast",
+      "fastDesc": "Upload and share files up to 2GB with our optimized infrastructure.",
+      "global": "Share Anywhere",
+      "globalDesc": "Generate secure links and QR codes to share files across any device or platform."
+    },
+    "map": {
+      "title": "Global User Activity",
+      "subtitle": "Live users around the world",
+      "activeUsers": "Active Users",
+      "lastActive": "Last active",
+      "countries": "Countries",
+      "highestActivity": "Highest Activity",
+      "averageUsers": "Avg per Country"
+    }
+  }
+} 

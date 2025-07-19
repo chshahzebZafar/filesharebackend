@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService } from '@/services/api';
+import { Link } from 'react-router-dom';
 
 interface StatsData {
   totalFiles: number;
@@ -204,6 +205,7 @@ const Stats = () => {
                       Expires: {new Date(user.planExpiry).toLocaleDateString()}
                     </p>
                   )}
+                  <Link to="/pricing" className="bg-teal-500 text-white px-6 py-2 mx-4 rounded-md hover:bg-teal-600 transition">Upgrade Plan</Link>
                 </div>
               </div>
             </CardContent>

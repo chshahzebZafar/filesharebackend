@@ -5,12 +5,16 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import { LanguageSelector } from './LanguageSelector';
+import { TransitionText } from './TransitionText';
+import { useTranslation } from 'react-i18next';
 
 const Header: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, user, logout, getCurrentPlan } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -89,7 +93,7 @@ const Header: React.FC = () => {
                 : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
             }`}
           >
-            Home
+            <TransitionText>{t('common.home', 'Home')}</TransitionText>
           </Link>
           
           {isAuthenticated ? (
@@ -103,9 +107,9 @@ const Header: React.FC = () => {
                 }`}
               >
                 <FolderOpen className="w-4 h-4" />
-                Files
+                <TransitionText>{t('common.files', 'Files')}</TransitionText>
               </Link>
-              <Link 
+              {/* <Link 
                 to="/ai-analyzer" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
                   isActive('/ai-analyzer') 
@@ -115,8 +119,8 @@ const Header: React.FC = () => {
               >
                 <Brain className="w-4 h-4" />
                 AI Analysis
-              </Link>
-              <Link 
+              </Link> */}
+              {/* <Link 
                 to="/collaboration" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
                   isActive('/collaboration') 
@@ -126,8 +130,8 @@ const Header: React.FC = () => {
               >
                 <MessageSquare className="w-4 h-4" />
                 Collaborate
-              </Link>
-              <Link 
+              </Link> */}
+              {/* <Link 
                 to="/analytics" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
                   isActive('/analytics') 
@@ -137,7 +141,7 @@ const Header: React.FC = () => {
               >
                 <TrendingUp className="w-4 h-4" />
                 Analytics
-              </Link>
+              </Link> */}
               <Link 
                 to="/stats" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
@@ -147,7 +151,7 @@ const Header: React.FC = () => {
                 }`}
               >
                 <BarChart3 className="w-4 h-4" />
-                Stats
+                <TransitionText>{t('common.stats', 'Stats')}</TransitionText>
               </Link>
               <Link 
                 to="/history" 
@@ -158,9 +162,9 @@ const Header: React.FC = () => {
                 }`}
               >
                 <History className="w-4 h-4" />
-                History
+                <TransitionText>{t('common.history', 'History')}</TransitionText>
               </Link>
-              <Link 
+              {/* <Link 
                 to="/download" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
                   isActive('/download') 
@@ -170,7 +174,7 @@ const Header: React.FC = () => {
               >
                 <Download className="w-4 h-4" />
                 Downloads
-              </Link>
+              </Link> */}
               <Link 
                 to="/settings" 
                 className={`transition-colors duration-200 flex items-center gap-1 ${
@@ -180,7 +184,7 @@ const Header: React.FC = () => {
                 }`}
               >
                 <SettingsIcon className="w-4 h-4" />
-                Settings
+                <TransitionText>{t('common.settings', 'Settings')}</TransitionText>
               </Link>
             </>
           ) : (
@@ -193,7 +197,7 @@ const Header: React.FC = () => {
                     : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
                 }`}
               >
-                Pricing
+                <TransitionText>{t('common.pricing', 'Pricing')}</TransitionText>
               </Link>
               <Link 
                 to="/about" 
@@ -203,7 +207,7 @@ const Header: React.FC = () => {
                     : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
                 }`}
               >
-                About
+                <TransitionText>{t('common.about', 'About')}</TransitionText>
               </Link>
               <Link 
                 to="/contact" 
@@ -213,13 +217,14 @@ const Header: React.FC = () => {
                     : 'text-gray-600 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400'
                 }`}
               >
-                Contact
+                <TransitionText>{t('common.contact', 'Contact')}</TransitionText>
               </Link>
             </>
           )}
         </nav>
         
         <div className="flex items-center space-x-2">
+          <LanguageSelector />
           {isAuthenticated ? (
             <div className="flex items-center space-x-3">
               {/* Plan Badge */}
@@ -259,21 +264,23 @@ const Header: React.FC = () => {
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      Profile
+                      <TransitionText>Profile</TransitionText>
                     </Link>
                     <Link 
                       to="/settings" 
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      Settings
+                      <TransitionText>Settings</TransitionText>
                     </Link>
                     <Link 
                       to="/pricing" 
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      {getCurrentPlan() === 'free' ? 'Upgrade Plan' : 'Manage Plan'}
+                      <TransitionText>
+                        {getCurrentPlan() === 'free' ? 'Upgrade Plan' : 'Manage Plan'}
+                      </TransitionText>
                     </Link>
                     
                     <div className="border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
@@ -282,7 +289,7 @@ const Header: React.FC = () => {
                         className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                       >
                         <LogOut className="w-4 h-4" />
-                        Logout
+                        <TransitionText>Logout</TransitionText>
                       </button>
                     </div>
                   </div>
@@ -293,12 +300,12 @@ const Header: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Link to="/login">
                 <Button variant="outline" size="sm">
-                  Login
+                  <TransitionText>Login</TransitionText>
                 </Button>
               </Link>
               <Link to="/signup">
                 <Button size="sm" className="bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700">
-                  Sign Up
+                  <TransitionText>Sign Up</TransitionText>
                 </Button>
               </Link>
             </div>

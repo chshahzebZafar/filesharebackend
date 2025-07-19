@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +20,15 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{
+    username?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    firstName?: string;
+    lastName?: string;
+    general?: string;
+  }>({});
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,65 +50,62 @@ const Signup = () => {
     return usernameRegex.test(username);
   };
 
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
+
+    // Username validation
+    if (!username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (!validateUsername(username)) {
+      newErrors.username = 'Username must be 3-30 characters and contain only letters, numbers, underscores, and hyphens';
+    }
+
+    // Email validation
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!validateEmail(email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Password validation
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long';
+    } else {
+      const hasUpperCase = /[A-Z]/.test(password);
+      const hasLowerCase = /[a-z]/.test(password);
+      const hasNumber = /\d/.test(password);
+
+      if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+        newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+      }
+    }
+
+    // Confirm password validation
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const clearErrors = () => {
+    setErrors({});
+  };
+
+  const clearFieldError = (field: keyof typeof errors) => {
+    setErrors(prev => ({ ...prev, [field]: undefined }));
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearErrors();
     
-    if (!username || !email || !password || !confirmPassword) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateUsername(username)) {
-      toast({
-        title: "Invalid username",
-        description: "Username must be 3-30 characters and contain only letters, numbers, underscores, and hyphens.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (password.length < 8) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 8 characters long.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check password complexity requirements
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumber = /\d/.test(password);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
-      toast({
-        title: "Password requirements not met",
-        description: "Password must contain at least one uppercase letter, one lowercase letter, and one number.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "Please make sure your passwords match.",
-        variant: "destructive",
-      });
+    if (!validateForm()) {
       return;
     }
 
@@ -124,14 +131,42 @@ const Signup = () => {
         // Redirect to the original destination or home
         navigate(redirectTo, { replace: true });
       } else {
+        // Handle specific error cases
+        if (result.message?.toLowerCase().includes('username already exists') ||
+            result.message?.toLowerCase().includes('username taken')) {
+          setErrors({ username: 'Username is already taken. Please choose a different one.' });
+        } else if (result.message?.toLowerCase().includes('email already exists') ||
+                   result.message?.toLowerCase().includes('email taken')) {
+          setErrors({ email: 'An account with this email already exists. Please use a different email or try logging in.' });
+        } else if (result.message?.toLowerCase().includes('invalid email')) {
+          setErrors({ email: 'Please enter a valid email address.' });
+        } else if (result.message?.toLowerCase().includes('password') && 
+                   result.message?.toLowerCase().includes('weak')) {
+          setErrors({ password: 'Password is too weak. Please choose a stronger password.' });
+        } else {
+          setErrors({ general: result.message || 'Registration failed. Please try again.' });
+        }
+
         toast({
           title: "Signup failed",
           description: result.message || "Something went wrong. Please try again.",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup error:', error);
+      
+      // Handle network errors
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setErrors({ general: 'Network error. Please check your connection and try again.' });
+      } else if (error.status === 429) {
+        setErrors({ general: 'Too many registration attempts. Please wait a moment before trying again.' });
+      } else if (error.status === 500) {
+        setErrors({ general: 'Server error. Please try again later.' });
+      } else {
+        setErrors({ general: 'Something went wrong. Please try again.' });
+      }
+
       toast({
         title: "Signup failed",
         description: "Something went wrong. Please try again.",
@@ -165,6 +200,14 @@ const Signup = () => {
           </CardHeader>
           
           <CardContent>
+            {/* General Error Alert */}
+            {errors.general && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errors.general}</AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username" className="flex items-center gap-2">
@@ -176,10 +219,21 @@ const Signup = () => {
                   type="text"
                   placeholder="Enter your username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (errors.username) clearFieldError('username');
+                  }}
+                  className={`bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 ${
+                    errors.username ? 'border-red-500 focus:border-red-500' : ''
+                  }`}
                   required
                 />
+                {errors.username && (
+                  <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.username}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -192,9 +246,20 @@ const Signup = () => {
                     type="text"
                     placeholder="First name"
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onChange={(e) => {
+                      setFirstName(e.target.value);
+                      if (errors.firstName) clearFieldError('firstName');
+                    }}
+                    className={`bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 ${
+                      errors.firstName ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
                   />
+                  {errors.firstName && (
+                    <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.firstName}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">
@@ -205,9 +270,20 @@ const Signup = () => {
                     type="text"
                     placeholder="Last name"
                     value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onChange={(e) => {
+                      setLastName(e.target.value);
+                      if (errors.lastName) clearFieldError('lastName');
+                    }}
+                    className={`bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 ${
+                      errors.lastName ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
                   />
+                  {errors.lastName && (
+                    <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.lastName}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -221,10 +297,21 @@ const Signup = () => {
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errors.email) clearFieldError('email');
+                  }}
+                  className={`bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 ${
+                    errors.email ? 'border-red-500 focus:border-red-500' : ''
+                  }`}
                   required
                 />
+                {errors.email && (
+                  <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -238,8 +325,13 @@ const Signup = () => {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 pr-10"
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) clearFieldError('password');
+                    }}
+                    className={`bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 pr-10 ${
+                      errors.password ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
                     required
                   />
                   <button
@@ -250,31 +342,14 @@ const Signup = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="text-right mt-1">
-                  <Link to="/forgot-password" className="text-sm text-teal-600 dark:text-teal-400 hover:underline">Forgot Password?</Link>
-                </div>
-                {password && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>At least 8 characters</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${/[A-Z]/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>One uppercase letter</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${/[a-z]/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>One lowercase letter</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${/\d/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>One number</span>
-                    </div>
-                  </div>
+                {errors.password && (
+                  <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.password}
+                  </p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
@@ -286,8 +361,13 @@ const Signup = () => {
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm your password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 pr-10"
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (errors.confirmPassword) clearFieldError('confirmPassword');
+                    }}
+                    className={`bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 pr-10 ${
+                      errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
                     required
                   />
                   <button
@@ -298,6 +378,12 @@ const Signup = () => {
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {errors.confirmPassword && (
+                  <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.confirmPassword}
+                  </p>
+                )}
               </div>
 
               <Button
@@ -308,7 +394,7 @@ const Signup = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating account...
+                    Creating Account...
                   </>
                 ) : (
                   'Create Account'

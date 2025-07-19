@@ -23,6 +23,7 @@ interface UploadedFile {
   shareId?: string;
   downloadUrl?: string;
   qrCode?: string;
+  bundleName?: string;
 }
 
 interface LinkSettingsProps {
@@ -36,8 +37,6 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
   const [showPassword, setShowPassword] = useState(false);
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [expiryTime, setExpiryTime] = useState('7');
-  const [generatedLink, setGeneratedLink] = useState('');
-  const [showQR, setShowQR] = useState(false);
   const [emails, setEmails] = useState<string[]>(['']);
   const [newEmail, setNewEmail] = useState('');
   const [oneTimeDownload, setOneTimeDownload] = useState(false);
@@ -63,29 +62,6 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onClose]);
-
-  const generateLink = () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to generate a share link.",
-        variant: "destructive",
-      });
-      // Redirect to login with current page as redirect parameter
-      navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-      onClose(); // Close the modal
-      return;
-    }
-
-    // This will be handled by the parent component now
-    // The link is already generated during upload
-    setShowQR(true);
-    
-    toast({
-      title: "Link ready!",
-      description: "Your secure transfer link is ready to share.",
-    });
-  };
 
   const addEmail = () => {
     if (newEmail.trim() && !emails.includes(newEmail.trim())) {
@@ -145,6 +121,8 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
 
   if (!isOpen) return null;
 
+  const shareLink = uploadedFiles[0]?.downloadUrl;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card ref={modalRef} className="w-full max-w-md animate-scale-in">
@@ -168,7 +146,6 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
                 onCheckedChange={setPasswordEnabled}
               />
             </div>
-            
             {passwordEnabled && (
               <div className="relative animate-fade-in">
                 <Input
@@ -234,8 +211,6 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
               <Mail className="w-4 h-4" />
               Share via Email
             </Label>
-            
-            {/* Email Input */}
             <div className="flex gap-2">
               <Input
                 type="email"
@@ -245,61 +220,28 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
                 onKeyPress={(e) => e.key === 'Enter' && addEmail()}
                 className="flex-1"
               />
-              <Button
-                size="sm"
-                onClick={addEmail}
-                disabled={!newEmail.trim() || !validateEmail(newEmail)}
-                className="shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
+              <Button size="sm" onClick={addEmail}><Plus className="w-4 h-4" /></Button>
             </div>
-
-            {/* Email List */}
-            {emails.filter(email => email.trim()).length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm">Recipients:</Label>
-                <div className="space-y-2">
-                  {emails.filter(email => email.trim()).map((email, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Badge 
-                        variant={validateEmail(email) ? "default" : "destructive"}
-                        className="flex-1 justify-between"
-                      >
-                        <span className="truncate">{email}</span>
-                        <button
-                          onClick={() => removeEmail(index)}
-                          className="ml-2 hover:bg-red-500 hover:text-white rounded-full p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  onClick={sendEmails}
-                  disabled={isSending || emails.filter(email => email.trim() && validateEmail(email)).length === 0}
-                  className="w-full bg-teal-600 hover:bg-teal-700"
-                >
-                  {isSending ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4 mr-2" />
-                      Send to {emails.filter(email => email.trim() && validateEmail(email)).length} recipient{emails.filter(email => email.trim() && validateEmail(email)).length !== 1 ? 's' : ''}
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {emails.filter(e => e).map((email, idx) => (
+                <Badge key={idx} className="flex items-center gap-1">
+                  {email}
+                  <button type="button" onClick={() => removeEmail(idx)}><X className="w-3 h-3" /></button>
+                </Badge>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              onClick={sendEmails}
+              disabled={isSending}
+              className="w-full mt-2"
+            >
+              {isSending ? 'Sending...' : 'Send Link via Email'}
+            </Button>
           </div>
 
-          {/* Single Share Link for All Files */}
-          {uploadedFiles.length > 0 && uploadedFiles[0]?.downloadUrl && (
+          {/* Share Link and QR Code */}
+          {shareLink && (
             <div className="space-y-4 animate-fade-in">
               <Label className="text-base font-semibold">Your Share Link</Label>
               <div className="space-y-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -310,73 +252,44 @@ const LinkSettings: React.FC<LinkSettingsProps> = ({ isOpen, onClose, uploadedFi
                 </div>
                 <div className="flex gap-2">
                   <Input 
-                    value={uploadedFiles[0].downloadUrl} 
+                    value={shareLink} 
                     readOnly 
                     className="bg-white dark:bg-gray-700 text-xs"
                   />
                   <Button
                     size="sm"
-                    onClick={() => copyToClipboard(uploadedFiles[0].downloadUrl!)}
+                    onClick={() => copyToClipboard(shareLink)}
                     className="shrink-0"
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
+                {/* QR Code */}
+                <div className="flex justify-center mt-4">
+                  <QRCodeGenerator url={shareLink} />
+                </div>
               </div>
             </div>
           )}
 
-          {/* Generate Link Button */}
-          {!generatedLink ? (
+          {/* Hide Generate button if link exists */}
+          {!shareLink && (
             <Button 
-              onClick={generateLink} 
+              onClick={() => {}} 
               className="w-full bg-teal-600 hover:bg-teal-700 transition-all duration-200 hover:scale-105"
             >
               Generate Share Link
             </Button>
-          ) : (
-            <div className="space-y-4 animate-fade-in">
-              {/* Generated Link */}
-              <div className="space-y-2">
-                <Label>Your Share Link</Label>
-                <div className="flex gap-2">
-                  <Input value={generatedLink} readOnly className="bg-gray-50 dark:bg-gray-800" />
-                  <Button
-                    size="sm"
-                    onClick={() => copyToClipboard(generatedLink)}
-                    className="shrink-0"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* QR Code */}
-              {showQR && (
-                <div className="text-center space-y-3">
-                  <QRCodeGenerator url={generatedLink} />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {/* QR download logic */}}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download QR Code
-                  </Button>
-                </div>
-              )}
-            </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-2 mt-6">
             <Button variant="outline" onClick={onClose} className="flex-1">
               Close
             </Button>
-            {generatedLink && (
+            {shareLink && (
               <Button 
-                onClick={() => copyToClipboard(generatedLink)} 
+                onClick={() => copyToClipboard(shareLink)} 
                 className="flex-1 bg-teal-600 hover:bg-teal-700"
               >
                 Share Link
