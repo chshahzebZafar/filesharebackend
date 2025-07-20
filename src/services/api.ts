@@ -347,6 +347,54 @@ class ApiService {
     }
   }
 
+  // Update user subscription plan
+  async updateUserPlan(plan: string): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      console.log('🔄 API: Updating user plan to:', plan);
+      console.log('🔑 API: Auth token:', this.getAuthToken() ? 'Present' : 'Missing');
+      
+      const response = await this.makeAuthenticatedRequest('/auth/update-plan', {
+        method: 'PUT',
+        body: JSON.stringify({ plan }),
+      });
+
+      console.log('📡 API: Update plan response status:', response.status);
+      console.log('📡 API: Update plan response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data = await response.json();
+      console.log('📡 API: Update plan response data:', data);
+
+      if (data.success) {
+        console.log('✅ API: Plan updated successfully');
+        return {
+          success: true,
+          message: data.message,
+          data: data.data
+        };
+      } else {
+        console.log('❌ API: Plan update failed:', data.message);
+        return {
+          success: false,
+          message: data.message || 'Failed to update plan'
+        };
+      }
+    } catch (error) {
+      console.error('🚨 API: Update plan error:', error);
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+          success: false,
+          message: 'Unable to connect to server. Please check your internet connection and try again.',
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Failed to update plan. Please try again.',
+      };
+    }
+  }
+
   // Health check for API availability
   async healthCheck(): Promise<{ status: string; timestamp: string; uptime: number }> {
     try {
@@ -535,6 +583,76 @@ class ApiService {
     const data = await response.json();
     console.log('🚀 ~ ApiService Response ~ uploadMultipleFiles ~ data:', data);
     return data.data || data;
+  }
+
+  async createShare(shareData: {
+    type: 'file' | 'folder' | 'collection';
+    resourceId: string;
+    access: {
+      type: 'public' | 'password' | 'email';
+      password?: string;
+      emails?: string[];
+      expiresAt?: string;
+      maxDownloads?: number;
+    };
+    settings?: {
+      allowDownload?: boolean;
+      allowPreview?: boolean;
+      allowComments?: boolean;
+    };
+  }): Promise<any> {
+    try {
+      console.log('🔗 Creating share with data:', shareData);
+      
+      const response = await this.makeAuthenticatedRequest('/share', {
+        method: 'POST',
+        body: JSON.stringify(shareData),
+      });
+
+      const data = await response.json();
+      console.log('🔗 Share creation response:', data);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.message || 'Failed to create share',
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('🚨 Create share error:', error);
+      return {
+        success: false,
+        message: 'Failed to create share',
+      };
+    }
+  }
+
+  async getShareInfo(shareId: string): Promise<any> {
+    try {
+      console.log('🔗 Getting share info for:', shareId);
+      
+      const response = await fetch(`${this.baseUrl}/share/public/${shareId}`);
+      const data = await response.json();
+      
+      console.log('🔗 Share info response:', data);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.message || 'Failed to get share info',
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('🚨 Get share info error:', error);
+      return {
+        success: false,
+        message: 'Failed to get share info',
+      };
+    }
   }
 }
 

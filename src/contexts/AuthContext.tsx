@@ -195,19 +195,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const updateUserPlan = (plan: string) => {
-    if (!user) return;
+  const updateUserPlan = async (plan: string) => {
+    if (!user) {
+      console.error('❌ No user found for plan update');
+      return;
+    }
     
-    const updatedUser = {
-      ...user,
-      plan,
-      subscription: {
-        ...user.subscription,
-        plan
+    try {
+      console.log('🔄 AuthContext: Updating plan to:', plan);
+      const response = await apiService.updateUserPlan(plan);
+      console.log('📡 AuthContext: API response:', response);
+      
+      if (response.success && response.data?.user) {
+        const updatedUser = convertBackendUser(response.data.user);
+        console.log('✅ AuthContext: Setting updated user:', updatedUser);
+        setUser(updatedUser);
+      } else {
+        console.error('❌ AuthContext: Plan update failed:', response.message);
       }
-    };
-    
-    setUser(updatedUser);
+    } catch (error) {
+      console.error('🚨 AuthContext: Plan update error:', error);
+    }
   };
 
   const updateUserPreferences = (preferences: Partial<User['preferences']>) => {
